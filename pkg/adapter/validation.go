@@ -38,14 +38,6 @@ func (a *Adapter) ValidateGetPageRequest(ctx context.Context, request *framework
 		}
 	}
 
-	// SCAFFOLDING #8 - pkg/adapter/validation.go: Modify this validation to match the authn mechanism(s) supported by the SoR.
-	if request.Auth == nil || request.Auth.Basic == nil {
-		return &framework.Error{
-			Message: "Provided datasource auth is missing required basic credentials.",
-			Code:    api_adapter_v1.ErrorCode_ERROR_CODE_INVALID_DATASOURCE_CONFIG,
-		}
-	}
-
 	if _, found := ValidEntityExternalIDs[request.Entity.ExternalId]; !found {
 		return &framework.Error{
 			Message: "Provided entity external ID is invalid.",
@@ -53,42 +45,17 @@ func (a *Adapter) ValidateGetPageRequest(ctx context.Context, request *framework
 		}
 	}
 
-	// Validate that at least the unique ID attribute for the requested entity
-	// is requested.
-	var uniqueIDAttributeFound bool
-
-	for _, attribute := range request.Entity.Attributes {
-		if attribute.ExternalId == ValidEntityExternalIDs[request.Entity.ExternalId].uniqueIDAttrExternalID {
-			uniqueIDAttributeFound = true
-
-			break
-		}
-	}
-
-	if !uniqueIDAttributeFound {
+	// Validate presence of token.
+	if request.Auth.HTTPAuthorization == "" {
 		return &framework.Error{
-			Message: "Requested entity attributes are missing unique ID attribute.",
-			Code:    api_adapter_v1.ErrorCode_ERROR_CODE_INVALID_ENTITY_CONFIG,
+			Message: "PagerDuty auth is missing required token.",
+			Code:    api_adapter_v1.ErrorCode_ERROR_CODE_INVALID_DATASOURCE_CONFIG,
 		}
 	}
-
-	// Validate that no child entities are requested.
-	//
 	// SCAFFOLDING #9 - pkg/adapter/validation.go: Modify this validation if the entity contains child entities.
 	if len(request.Entity.ChildEntities) > 0 {
 		return &framework.Error{
 			Message: "Requested entity does not support child entities.",
-			Code:    api_adapter_v1.ErrorCode_ERROR_CODE_INVALID_ENTITY_CONFIG,
-		}
-	}
-
-	// SCAFFOLDING #10 - pkg/adapter/validation.go: Check for Ordered responses.
-	// If the datasource doesn't support sorting results by unique ID
-	// attribute for the requested entity, check instead that Ordered is set to
-	// false.
-	if !request.Ordered {
-		return &framework.Error{
-			Message: "Ordered must be set to true.",
 			Code:    api_adapter_v1.ErrorCode_ERROR_CODE_INVALID_ENTITY_CONFIG,
 		}
 	}
