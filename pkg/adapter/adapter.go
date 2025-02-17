@@ -35,7 +35,7 @@ type Adapter struct {
 }
 
 // NewAdapter instantiates a new Adapter.
-//
+// 
 // SCAFFOLDING #21 - pkg/adapter/adapter.go: Add or remove parameters to match field updates above.
 func NewAdapter(client Client) framework.Adapter[Config] {
 	return &Adapter{
@@ -68,13 +68,9 @@ func (a *Adapter) RequestPageFromDatasource(
 	req := &Request{
 		BaseURL: request.Address,
 
-		// Basic Auth
-		Username: request.Auth.Basic.Username,
-		Password: request.Auth.Basic.Password,
-
 		// API Key or OAuth2 Token
 		Token:            request.Auth.HTTPAuthorization,
-		
+
 		PageSize:         request.PageSize,
 		EntityExternalID: request.Entity.ExternalId,
 		Cursor:           request.Cursor,
