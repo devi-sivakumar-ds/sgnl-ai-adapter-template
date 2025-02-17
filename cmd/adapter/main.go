@@ -23,7 +23,7 @@ import (
 
 	api_adapter_v1 "github.com/sgnl-ai/adapter-framework/api/adapter/v1"
 	"github.com/sgnl-ai/adapter-framework/server"
-	"github.com/sgnl-ai/adapter-template/pkg/adapter"
+	"github.com/sgnl-ai-assignment/adapter/pkg/adapter"
 	"google.golang.org/grpc"
 )
 
@@ -55,7 +55,7 @@ func main() {
 	// SCAFFOLDING #2 - cmd/adapter/main.go: Update Adapter type.
 	// The Adapter type below must be unique across all registered Adapters and match the Adapter
 	// type configured on the Adapter object via the SGNL Config API.
-	//
+	// 
 	// If you need to run multiple adapters on the same gRPC server, they can be registered here.
 	err = server.RegisterAdapter(adapterServer, "Test-1.0.0", adapter.NewAdapter(adapter.NewClient(*Timeout)))
 	if err != nil {
