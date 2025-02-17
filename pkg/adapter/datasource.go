@@ -16,11 +16,11 @@ package adapter
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	framework "github.com/sgnl-ai/adapter-framework"
@@ -31,6 +31,7 @@ const (
 	// SCAFFOLDING #11 - pkg/adapter/datasource.go: Update the set of valid entity types this adapter supports.
 	Users  string = "users"
 	Groups string = "groups"
+	Teams  string = "teams"
 )
 
 // Entity contains entity specific information, such as the entity's unique ID attribute and the
@@ -54,7 +55,8 @@ type DatasourceResponse struct {
 	// SCAFFOLDING #13  - pkg/adapter/datasource.go: Add or remove fields in the response as necessary. This is used to unmarshal the response from the SoR.
 
 	// SCAFFOLDING #14 - pkg/adapter/datasource.go: Update `objects` with field name in the SoR response that contains the list of objects.
-	Objects []map[string]any `json:"objects,omitempty"`
+	Objects []map[string]any `json:"teams,omitempty"`
+	More    bool             `json:"more"`
 }
 
 var (
@@ -68,6 +70,9 @@ var (
 		},
 		Groups: {
 			uniqueIDAttrExternalID: "group_id",
+		},
+		Teams: {
+			uniqueIDAttrExternalID: "teams",
 		},
 	}
 )
@@ -87,8 +92,20 @@ func (d *Datasource) GetPage(ctx context.Context, request *Request) (*Response, 
 	// SCAFFOLDING #16 - pkg/adapter/datasource.go: Create the SoR API URL
 	// Populate the request with the appropriate path, headers, and query parameters to query the
 	// datasource.
-	url := fmt.Sprintf("%s/api/%s", request.BaseURL, request.EntityExternalID)
+	var offset int64 = 0
+	if request.Cursor != "" {
+		var err error
+		offset, err = strconv.ParseInt(request.Cursor, 10, 64)
+		if err != nil || offset < 0 {
+			return nil, &framework.Error{
+				Message: "Invalid cursor value.",
+				Code:    api_adapter_v1.ErrorCode_ERROR_CODE_INVALID_PAGE_REQUEST_CONFIG,
+			}
+		}
+	}
 
+	url := fmt.Sprintf("%s/%s?offset=%d&limit=%d", request.BaseURL, request.EntityExternalID, offset, request.PageSize)
+	nextCursorValue := offset + request.PageSize
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, &framework.Error{
@@ -107,14 +124,8 @@ func (d *Datasource) GetPage(ctx context.Context, request *Request) (*Response, 
 	// Add headers to the request, if any.
 	// req.Header.Add("Accept", "application/json")
 
-	if request.Token == "" {
-		// Basic Authentication
-		auth := request.Username + ":" + request.Password
-		req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(auth)))
-	} else {
-		// Auth Token for Bearer or OAuth2.0 Client Credentials flow
-		req.Header.Add("Authorization", request.Token)
-	}
+	// Auth Token for Bearer or OAuth2.0 Client Credentials flow
+	req.Header.Add("Authorization", request.Token)
 
 	res, err := d.Client.Do(req)
 	if err != nil {
@@ -142,9 +153,10 @@ func (d *Datasource) GetPage(ctx context.Context, request *Request) (*Response, 
 			Code:    api_adapter_v1.ErrorCode_ERROR_CODE_DATASOURCE_FAILED,
 		}
 	}
+
 	// SCAFFOLDING #17-1 - pkg/adapter/datasource.go: To add support for multiple entities that require different parsing functions
 	// Add code to call different ParseResponse functions for each entity response.
-	objects, nextCursor, parseErr := ParseResponse(body)
+	objects, nextCursor, parseErr := ParseResponse(body, nextCursorValue)
 	if parseErr != nil {
 		return nil, parseErr
 	}
@@ -155,7 +167,7 @@ func (d *Datasource) GetPage(ctx context.Context, request *Request) (*Response, 
 	return response, nil
 }
 
-func ParseResponse(body []byte) (objects []map[string]any, nextCursor string, err *framework.Error) {
+func ParseResponse(body []byte, nextCursorValue int64) (objects []map[string]any, nextCursor string, err *framework.Error) {
 	var data *DatasourceResponse
 
 	unmarshalErr := json.Unmarshal(body, &data)
@@ -171,7 +183,11 @@ func ParseResponse(body []byte) (objects []map[string]any, nextCursor string, er
 
 	// SCAFFOLDING #19 - pkg/adapter/datasource.go: Populate next page information (called cursor in SGNL adapters).
 	// Populate nextCursor with the cursor returned from the datasource, if present.
-	nextCursor = ""
+	if data.More {
+		nextCursor = fmt.Sprintf("%d", nextCursorValue)
+	} else {
+		nextCursor = ""
+	}
 
 	return data.Objects, nextCursor, nil
 }
