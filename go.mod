@@ -1,4 +1,4 @@
-module github.com/sgnl-ai/adapter-template
+module github.com/sgnl-ai-assignment/adapter-template
 
 go 1.21
 
